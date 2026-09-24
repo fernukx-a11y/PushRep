@@ -92,13 +92,34 @@
             top: 20px;
             left: 50%;
             transform: translateX(-50%);
+
             padding: 10px 16px;
             border-radius: 12px;
+
             background: rgba(0, 0, 0, 0.65);
             color: white;
+
             font-size: 15px;
             z-index: 10;
             white-space: nowrap;
+        }
+
+        #counter {
+            position: absolute;
+            top: 70px;
+            left: 50%;
+            transform: translateX(-50%);
+
+            color: white;
+            background: rgba(0, 0, 0, 0.7);
+
+            padding: 10px 22px;
+            border-radius: 15px;
+
+            font-size: 28px;
+            font-weight: bold;
+
+            z-index: 10;
         }
     </style>
 </head>
@@ -117,6 +138,7 @@
 
 </div>
 
+
 <div id="cameraBox">
 
     <video id="camera"
@@ -131,11 +153,17 @@
         Запуск...
     </div>
 
+    <div id="counter">
+        Отжимания: 0
+    </div>
+
 </div>
+
 
 <script>
 
-const button = document.getElementById("cameraButton");
+const button =
+    document.getElementById("cameraButton");
 
 const startScreen =
     document.getElementById("startScreen");
@@ -155,6 +183,9 @@ const ctx =
 const status =
     document.getElementById("status");
 
+const counter =
+    document.getElementById("counter");
+
 
 let pose = null;
 
@@ -164,23 +195,39 @@ let aiReady = false;
 
 
 /* =========================
-   КНОПКА
+   СЧЁТЧИК
 ========================= */
 
-button.addEventListener("click", startCamera);
+let pushUps = 0;
+
+let position = "up";
+
+let downDetected = false;
 
 
 /* =========================
-   ЗАПУСК КАМЕРЫ
+   КНОПКА
+========================= */
+
+button.addEventListener(
+    "click",
+    startCamera
+);
+
+
+/* =========================
+   КАМЕРА
 ========================= */
 
 async function startCamera() {
 
     try {
 
-        startScreen.style.display = "none";
+        startScreen.style.display =
+            "none";
 
-        cameraBox.style.display = "block";
+        cameraBox.style.display =
+            "block";
 
         status.textContent =
             "Запрашиваем камеру...";
@@ -190,6 +237,7 @@ async function startCamera() {
             await navigator.mediaDevices.getUserMedia({
 
                 video: {
+
                     facingMode: "user",
 
                     width: {
@@ -199,6 +247,7 @@ async function startCamera() {
                     height: {
                         ideal: 1080
                     }
+
                 },
 
                 audio: false
@@ -411,10 +460,187 @@ function onResults(results) {
         status.textContent =
             "Человек обнаружен 🤖";
 
+
+        countPushUp(
+            results.poseLandmarks
+        );
+
+
     } else {
 
         status.textContent =
             "Встань в кадр";
+
+    }
+
+}
+
+
+/* =========================
+   УГОЛ
+========================= */
+
+function calculateAngle(
+    a,
+    b,
+    c
+) {
+
+    const radians =
+        Math.atan2(
+            c.y - b.y,
+            c.x - b.x
+        ) -
+        Math.atan2(
+            a.y - b.y,
+            a.x - b.x
+        );
+
+
+    let angle =
+        Math.abs(
+            radians * 180.0 / Math.PI
+        );
+
+
+    if (angle > 180) {
+
+        angle =
+            360 - angle;
+
+    }
+
+
+    return angle;
+}
+
+
+/* =========================
+   СЧЁТ ОТЖИМАНИЙ
+========================= */
+
+function countPushUp(
+    landmarks
+) {
+
+    /*
+     * Левая сторона:
+     *
+     * 11 = левое плечо
+     * 13 = левый локоть
+     * 15 = левое запястье
+     */
+
+    const shoulder =
+        landmarks[11];
+
+    const elbow =
+        landmarks[13];
+
+    const wrist =
+        landmarks[15];
+
+
+    /*
+     * Правая сторона
+     */
+
+    const shoulderRight =
+        landmarks[12];
+
+    const elbowRight =
+        landmarks[14];
+
+    const wristRight =
+        landmarks[16];
+
+
+    /*
+     * Проверяем видимость точек
+     */
+
+    if (
+        shoulder.visibility < 0.5 ||
+        elbow.visibility < 0.5 ||
+        wrist.visibility < 0.5
+    ) {
+
+        return;
+
+    }
+
+
+    /*
+     * Считаем угол локтя
+     */
+
+    const leftAngle =
+        calculateAngle(
+            shoulder,
+            elbow,
+            wrist
+        );
+
+
+    const rightAngle =
+        calculateAngle(
+            shoulderRight,
+            elbowRight,
+            wristRight
+        );
+
+
+    /*
+     * Средний угол
+     */
+
+    const angle =
+        (
+            leftAngle +
+            rightAngle
+        ) / 2;
+
+
+    /*
+     * НИЖНЯЯ ТОЧКА
+     *
+     * Локоть согнут
+     */
+
+    if (
+        angle < 100 &&
+        position === "up"
+    ) {
+
+        position = "down";
+
+        downDetected = true;
+
+    }
+
+
+    /*
+     * ВЕРХНЯЯ ТОЧКА
+     *
+     * Руки снова выпрямлены
+     */
+
+    if (
+        angle > 155 &&
+        position === "down" &&
+        downDetected
+    ) {
+
+        pushUps++;
+
+        downDetected = false;
+
+        position = "up";
+
+
+        counter.textContent =
+            "Отжимания: " +
+            pushUps;
 
     }
 
