@@ -9,7 +9,6 @@
 
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
 
-    <!-- MediaPipe -->
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
@@ -38,7 +37,6 @@
             align-items: center;
             color: white;
             text-align: center;
-            padding: 20px;
         }
 
         #startScreen h1 {
@@ -92,13 +90,10 @@
             top: 20px;
             left: 50%;
             transform: translateX(-50%);
-
             padding: 10px 16px;
             border-radius: 12px;
-
             background: rgba(0, 0, 0, 0.75);
             color: white;
-
             font-size: 15px;
             z-index: 10;
             white-space: nowrap;
@@ -109,16 +104,12 @@
             top: 70px;
             left: 50%;
             transform: translateX(-50%);
-
             color: white;
             background: rgba(0, 0, 0, 0.75);
-
             padding: 10px 22px;
             border-radius: 15px;
-
             font-size: 28px;
             font-weight: bold;
-
             z-index: 10;
         }
     </style>
@@ -233,7 +224,6 @@ async function startCamera() {
             await navigator.mediaDevices.getUserMedia({
 
                 video: {
-
                     facingMode: "user",
 
                     width: {
@@ -243,17 +233,14 @@ async function startCamera() {
                     height: {
                         ideal: 1080
                     }
-
                 },
 
                 audio: false
-
             });
 
 
         video.srcObject =
             cameraStream;
-
 
         await video.play();
 
@@ -276,17 +263,17 @@ async function startCamera() {
 
         console.error(error);
 
-        cameraBox.style.display = "none";
+        cameraBox.style.display =
+            "none";
 
-        startScreen.style.display = "flex";
+        startScreen.style.display =
+            "flex";
 
         alert(
             "Ошибка камеры:\n" +
             error.message
         );
-
     }
-
 }
 
 
@@ -300,7 +287,9 @@ function startAI() {
         "Загружаем AI...";
 
 
-    if (typeof Pose === "undefined") {
+    if (
+        typeof Pose === "undefined"
+    ) {
 
         status.textContent =
             "AI ещё загружается...";
@@ -322,9 +311,7 @@ function startAI() {
                 "https://cdn.jsdelivr.net/npm/@mediapipe/pose/" +
                 file
             );
-
         }
-
     });
 
 
@@ -341,11 +328,12 @@ function startAI() {
         minDetectionConfidence: 0.5,
 
         minTrackingConfidence: 0.5
-
     });
 
 
-    pose.onResults(onResults);
+    pose.onResults(
+        onResults
+    );
 
 
     aiReady = true;
@@ -355,7 +343,6 @@ function startAI() {
 
 
     detectPose();
-
 }
 
 
@@ -387,19 +374,17 @@ async function detectPose() {
     } catch (error) {
 
         console.error(error);
-
     }
 
 
     requestAnimationFrame(
         detectPose
     );
-
 }
 
 
 /* =========================
-   РЕЗУЛЬТАТ AI
+   РЕЗУЛЬТАТ
 ========================= */
 
 function onResults(results) {
@@ -419,7 +404,9 @@ function onResults(results) {
     );
 
 
-    if (results.poseLandmarks) {
+    if (
+        results.poseLandmarks
+    ) {
 
         drawConnectors(
             ctx,
@@ -452,14 +439,12 @@ function onResults(results) {
 
         status.textContent =
             "Встань в кадр";
-
     }
-
 }
 
 
 /* =========================
-   УГОЛ ТРЁХ ТОЧЕК
+   УГОЛ
 ========================= */
 
 function calculateAngle(a, b, c) {
@@ -482,10 +467,7 @@ function calculateAngle(a, b, c) {
 
 
     if (angle > 180) {
-
-        angle =
-            360 - angle;
-
+        angle = 360 - angle;
     }
 
 
@@ -494,24 +476,23 @@ function calculateAngle(a, b, c) {
 
 
 /* =========================
-   ПРОВЕРКА ВИДИМОСТИ
+   ВИДИМОСТЬ
 ========================= */
 
 function visible(point) {
 
     return (
         point &&
-        point.visibility !== undefined &&
-        point.visibility >= 0.55
+        point.visibility >= 0.45
     );
 }
 
 
 /* =========================
-   ПРОВЕРКА КОЛЕНЕЙ
+   ПРОВЕРКА НОГ
 ========================= */
 
-function kneesAreStraight(landmarks) {
+function legsAreExtended(landmarks) {
 
     const leftHip =
         landmarks[23];
@@ -521,7 +502,6 @@ function kneesAreStraight(landmarks) {
 
     const leftAnkle =
         landmarks[27];
-
 
     const rightHip =
         landmarks[24];
@@ -533,32 +513,19 @@ function kneesAreStraight(landmarks) {
         landmarks[28];
 
 
-    /*
-     * Если ноги не видны,
-     * не засчитываем повтор.
-     */
-
     if (
         !visible(leftHip) ||
         !visible(leftKnee) ||
         !visible(leftAnkle) ||
+
         !visible(rightHip) ||
         !visible(rightKnee) ||
         !visible(rightAnkle)
     ) {
 
         return false;
-
     }
 
-
-    /*
-     * Угол колена.
-     *
-     * Прямая нога ≈ 180°.
-     * При отжимании с колен
-     * угол значительно меньше.
-     */
 
     const leftKneeAngle =
         calculateAngle(
@@ -577,13 +544,15 @@ function kneesAreStraight(landmarks) {
 
 
     /*
-     * Обе ноги должны быть
-     * достаточно прямыми.
+     * Мягкий порог.
+     *
+     * Если человек стоит на коленях,
+     * угол обычно значительно меньше.
      */
 
     return (
-        leftKneeAngle > 150 &&
-        rightKneeAngle > 150
+        leftKneeAngle > 135 &&
+        rightKneeAngle > 135
     );
 }
 
@@ -592,7 +561,7 @@ function kneesAreStraight(landmarks) {
    ПРОВЕРКА КОРПУСА
 ========================= */
 
-function bodyIsStraight(landmarks) {
+function bodyIsReasonablyStraight(landmarks) {
 
     const leftShoulder =
         landmarks[11];
@@ -628,14 +597,7 @@ function bodyIsStraight(landmarks) {
     }
 
 
-    /*
-     * Угол плечо-таз-лодыжка.
-     *
-     * Для прямого тела он
-     * должен быть близок к 180°.
-     */
-
-    const leftBodyAngle =
+    const leftAngle =
         calculateAngle(
             leftShoulder,
             leftHip,
@@ -643,7 +605,7 @@ function bodyIsStraight(landmarks) {
         );
 
 
-    const rightBodyAngle =
+    const rightAngle =
         calculateAngle(
             rightShoulder,
             rightHip,
@@ -652,12 +614,12 @@ function bodyIsStraight(landmarks) {
 
 
     /*
-     * Допускаем небольшой наклон.
+     * Не требуем идеальной прямой.
      */
 
     return (
-        leftBodyAngle > 155 &&
-        rightBodyAngle > 155
+        leftAngle > 135 &&
+        rightAngle > 135
     );
 }
 
@@ -666,7 +628,7 @@ function bodyIsStraight(landmarks) {
    ПРОВЕРКА ЛОКТЕЙ
 ========================= */
 
-function elbowsAreGood(landmarks) {
+function elbowsAreAcceptable(landmarks) {
 
     const leftShoulder =
         landmarks[11];
@@ -719,22 +681,8 @@ function elbowsAreGood(landmarks) {
 
 
     /*
-     * На верхней точке руки
-     * должны быть почти выпрямлены.
-     */
-
-    const goodTop =
-        leftAngle > 150 &&
-        rightAngle > 150;
-
-
-    /*
-     * Не разрешаем слишком
-     * экстремальное положение локтей.
-     *
-     * Проверяем расстояние локтя
-     * от плеча относительно
-     * расстояния плеч.
+     * Слишком экстремально
+     * разведённые локти.
      */
 
     const shoulderWidth =
@@ -751,26 +699,17 @@ function elbowsAreGood(landmarks) {
         );
 
 
-    /*
-     * Если локти сильно разлетаются
-     * в стороны, движение не считаем
-     * правильным.
-     */
-
     const elbowsTooWide =
         elbowWidth >
-        shoulderWidth * 2.0;
+        shoulderWidth * 2.5;
 
 
-    return (
-        goodTop &&
-        !elbowsTooWide
-    );
+    return !elbowsTooWide;
 }
 
 
 /* =========================
-   ОСНОВНОЙ СЧЁТЧИК
+   СЧЁТЧИК
 ========================= */
 
 function countPushUp(landmarks) {
@@ -813,41 +752,7 @@ function countPushUp(landmarks) {
 
 
     /*
-     * Проверяем ноги.
-     */
-
-    const straightLegs =
-        kneesAreStraight(landmarks);
-
-
-    if (!straightLegs) {
-
-        status.textContent =
-            "Выпрями ноги";
-
-        return;
-    }
-
-
-    /*
-     * Проверяем корпус.
-     */
-
-    const straightBody =
-        bodyIsStraight(landmarks);
-
-
-    if (!straightBody) {
-
-        status.textContent =
-            "Держи корпус ровно";
-
-        return;
-    }
-
-
-    /*
-     * Углы локтей.
+     * Угол локтей
      */
 
     const leftAngle =
@@ -874,20 +779,45 @@ function countPushUp(landmarks) {
 
 
     /*
+     * Проверяем ноги.
+     */
+
+    const legsOK =
+        legsAreExtended(
+            landmarks
+        );
+
+
+    /*
+     * Проверяем корпус.
+     */
+
+    const bodyOK =
+        bodyIsReasonablyStraight(
+            landmarks
+        );
+
+
+    /*
      * НИЖНЯЯ ТОЧКА
      */
 
     if (
-        averageAngle < 105 &&
+        averageAngle < 110 &&
         position === "up"
     ) {
+
+        /*
+         * Запоминаем движение вниз,
+         * даже если техника немного плохая.
+         */
 
         position = "down";
 
         canCount = true;
 
         status.textContent =
-            "Теперь вверх 💪";
+            "Вверх 💪";
 
         return;
     }
@@ -898,19 +828,34 @@ function countPushUp(landmarks) {
      */
 
     if (
-        averageAngle > 155 &&
+        averageAngle > 150 &&
         position === "down" &&
         canCount
     ) {
 
         /*
-         * Перед засчётом ещё раз
-         * проверяем локти.
+         * Повтор засчитываем только
+         * если ноги и корпус подходят.
          */
 
-        if (
-            elbowsAreGood(landmarks)
+        if (!legsOK) {
+
+            status.textContent =
+                "Выпрями ноги ❌";
+
+        } else if (!bodyOK) {
+
+            status.textContent =
+                "Держи корпус ровнее ❌";
+
+        } else if (
+            !elbowsAreAcceptable(landmarks)
         ) {
+
+            status.textContent =
+                "Локти слишком в стороны ❌";
+
+        } else {
 
             pushUps++;
 
@@ -919,12 +864,7 @@ function countPushUp(landmarks) {
                 pushUps;
 
             status.textContent =
-                "Правильное повторение ✅";
-
-        } else {
-
-            status.textContent =
-                "Локти слишком в стороны ❌";
+                "Отжимание засчитано ✅";
         }
 
 
@@ -937,17 +877,15 @@ function countPushUp(landmarks) {
 
 
     /*
-     * Разрешаем следующий цикл,
-     * когда руки снова согнулись.
+     * Подготовка следующего повтора.
      */
 
     if (
-        averageAngle < 115 &&
+        averageAngle < 120 &&
         position === "up"
     ) {
 
         canCount = true;
-
     }
 
 }
