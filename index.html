@@ -2,12 +2,12 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport"
-          content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+    >
 
     <title>PushRep</title>
-
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
 
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
@@ -18,352 +18,222 @@
             box-sizing: border-box;
         }
 
-        html, body {
+        body {
             margin: 0;
-            padding: 0;
-            width: 100%;
-            height: 100%;
-            overflow: hidden;
-            background: #000;
-            font-family: Arial, sans-serif;
-        }
-
-        #startScreen {
-            width: 100%;
-            height: 100%;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
+            background: #111;
             color: white;
+            font-family: Arial, sans-serif;
             text-align: center;
-        }
-
-        #startScreen h1 {
-            font-size: 32px;
-            margin: 0 0 10px;
-        }
-
-        #startScreen p {
-            color: #aaa;
-        }
-
-        #cameraButton {
-            margin-top: 25px;
-            padding: 16px 28px;
-            border: none;
-            border-radius: 14px;
-            font-size: 18px;
-            font-weight: bold;
-            cursor: pointer;
-        }
-
-        #cameraBox {
-            position: fixed;
-            inset: 0;
-            width: 100vw;
-            height: 100vh;
-            background: #000;
-            display: none;
             overflow: hidden;
         }
 
-        #camera {
-            position: absolute;
-            inset: 0;
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            transform: none;
-        }
-
-        #canvas {
-            position: absolute;
-            inset: 0;
-            width: 100%;
-            height: 100%;
-            transform: none;
+        h1 {
+            margin: 15px 0 5px;
+            font-size: 28px;
         }
 
         #status {
-            position: absolute;
-            top: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            padding: 10px 16px;
-            border-radius: 12px;
-            background: rgba(0, 0, 0, 0.75);
-            color: white;
+            margin: 5px 15px 10px;
+            color: #aaa;
             font-size: 15px;
-            z-index: 10;
-            white-space: nowrap;
+            min-height: 20px;
+        }
+
+        #cameraContainer {
+            position: relative;
+            width: 100%;
+            height: calc(100vh - 180px);
+            min-height: 350px;
+            overflow: hidden;
+            background: black;
+        }
+
+        #video,
+        #canvas {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            left: 0;
+            top: 0;
+            transform: none;
+        }
+
+        #video {
+            z-index: 1;
+        }
+
+        #canvas {
+            z-index: 2;
+            pointer-events: none;
         }
 
         #counter {
             position: absolute;
-            top: 70px;
+            z-index: 5;
+            top: 15px;
             left: 50%;
             transform: translateX(-50%);
-            color: white;
-            background: rgba(0, 0, 0, 0.75);
-            padding: 10px 22px;
-            border-radius: 15px;
-            font-size: 28px;
+            font-size: 55px;
             font-weight: bold;
-            z-index: 10;
+            text-shadow: 0 2px 8px black;
+        }
+
+        #cameraButton {
+            margin-top: 15px;
+            padding: 14px 25px;
+            border: none;
+            border-radius: 12px;
+            background: #00c853;
+            color: white;
+            font-size: 18px;
+            font-weight: bold;
+        }
+
+        #cameraButton:active {
+            transform: scale(0.97);
         }
     </style>
 </head>
 
 <body>
 
-<div id="startScreen">
+<h1>💪 PushRep</h1>
 
-    <h1>💪 PushRep</h1>
+<div id="status">Нажми кнопку и начни тренировку</div>
 
-    <p>AI-счётчик отжиманий</p>
-
-    <button id="cameraButton">
-        📷 Включить камеру
-    </button>
-
-</div>
-
-
-<div id="cameraBox">
-
-    <video id="camera"
-           autoplay
-           playsinline
-           muted>
-    </video>
-
+<div id="cameraContainer">
+    <video id="video" autoplay playsinline muted></video>
     <canvas id="canvas"></canvas>
 
-    <div id="status">
-        Запуск...
-    </div>
-
-    <div id="counter">
-        Отжимания: 0
-    </div>
-
+    <div id="counter">0</div>
 </div>
 
+<button id="cameraButton">📷 Начать тренировку</button>
 
 <script>
 
-const button =
-    document.getElementById("cameraButton");
+const video = document.getElementById("video");
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
 
-const startScreen =
-    document.getElementById("startScreen");
-
-const cameraBox =
-    document.getElementById("cameraBox");
-
-const video =
-    document.getElementById("camera");
-
-const canvas =
-    document.getElementById("canvas");
-
-const ctx =
-    canvas.getContext("2d");
-
-const status =
-    document.getElementById("status");
-
-const counter =
-    document.getElementById("counter");
-
+const button = document.getElementById("cameraButton");
+const status = document.getElementById("status");
+const counter = document.getElementById("counter");
 
 let pose = null;
 let cameraStream = null;
 let aiReady = false;
 
-
-/* =========================
-   СЧЁТЧИК
-========================= */
-
 let pushUps = 0;
 
 let position = "up";
-
 let canCount = true;
 
-
-/* =========================
-   КНОПКА
-========================= */
-
-button.addEventListener(
-    "click",
-    startCamera
-);
+let lastCountTime = 0;
 
 
-/* =========================
-   КАМЕРА
-========================= */
+// ===============================
+// КАМЕРА
+// ===============================
 
 async function startCamera() {
 
     try {
 
-        startScreen.style.display = "none";
+        status.textContent = "Запрашиваю камеру...";
 
-        cameraBox.style.display = "block";
+        cameraStream = await navigator.mediaDevices.getUserMedia({
+            video: {
+                facingMode: "user",
+                width: { ideal: 1920 },
+                height: { ideal: 1080 }
+            },
+            audio: false
+        });
 
-        status.textContent =
-            "Запрашиваем камеру...";
-
-
-        cameraStream =
-            await navigator.mediaDevices.getUserMedia({
-
-                video: {
-                    facingMode: "user",
-
-                    width: {
-                        ideal: 1920
-                    },
-
-                    height: {
-                        ideal: 1080
-                    }
-                },
-
-                audio: false
-            });
-
-
-        video.srcObject =
-            cameraStream;
+        video.srcObject = cameraStream;
 
         await video.play();
 
+        canvas.width = video.videoWidth || 1280;
+        canvas.height = video.videoHeight || 720;
 
-        canvas.width =
-            video.videoWidth;
+        status.textContent = "Камера работает. Загружаю AI...";
 
-        canvas.height =
-            video.videoHeight;
-
-
-        status.textContent =
-            "Камера работает ✅";
-
-
-        startAI();
-
+        await startAI();
 
     } catch (error) {
 
         console.error(error);
 
-        cameraBox.style.display =
-            "none";
-
-        startScreen.style.display =
-            "flex";
-
-        alert(
-            "Ошибка камеры:\n" +
-            error.message
-        );
+        status.textContent =
+            "Ошибка камеры: " + error.message;
     }
 }
 
 
-/* =========================
-   AI
-========================= */
+// ===============================
+// AI
+// ===============================
 
-function startAI() {
+async function startAI() {
 
-    status.textContent =
-        "Загружаем AI...";
+    try {
 
+        pose = new Pose({
+            locateFile: function(file) {
 
-    if (
-        typeof Pose === "undefined"
-    ) {
+                return (
+                    "https://cdn.jsdelivr.net/npm/@mediapipe/pose/" +
+                    file
+                );
+
+            }
+        });
+
+        pose.setOptions({
+
+            modelComplexity: 1,
+
+            smoothLandmarks: true,
+
+            enableSegmentation: false,
+
+            smoothSegmentation: false,
+
+            minDetectionConfidence: 0.5,
+
+            minTrackingConfidence: 0.5
+
+        });
+
+        pose.onResults(onResults);
+
+        aiReady = true;
 
         status.textContent =
-            "AI ещё загружается...";
+            "AI готов. Встань боком и начинай отжиматься.";
 
-        setTimeout(
-            startAI,
-            1000
-        );
+        processFrame();
 
-        return;
+    } catch (error) {
+
+        console.error(error);
+
+        status.textContent =
+            "Ошибка AI: " + error.message;
     }
-
-
-    pose = new Pose({
-
-        locateFile: function(file) {
-
-            return (
-                "https://cdn.jsdelivr.net/npm/@mediapipe/pose/" +
-                file
-            );
-        }
-    });
-
-
-    pose.setOptions({
-
-        modelComplexity: 1,
-
-        smoothLandmarks: true,
-
-        enableSegmentation: false,
-
-        smoothSegmentation: false,
-
-        minDetectionConfidence: 0.5,
-
-        minTrackingConfidence: 0.5
-    });
-
-
-    pose.onResults(
-        onResults
-    );
-
-
-    aiReady = true;
-
-    status.textContent =
-        "AI готов 🤖";
-
-
-    detectPose();
 }
 
 
-/* =========================
-   РАСПОЗНАВАНИЕ
-========================= */
+// ===============================
+// ОБРАБОТКА КАДРОВ
+// ===============================
 
-async function detectPose() {
+async function processFrame() {
 
-    if (
-        !aiReady ||
-        !video.videoWidth
-    ) {
-
-        requestAnimationFrame(
-            detectPose
-        );
-
-        return;
-    }
-
+    if (!aiReady) return;
 
     try {
 
@@ -374,27 +244,21 @@ async function detectPose() {
     } catch (error) {
 
         console.error(error);
+
     }
 
-
-    requestAnimationFrame(
-        detectPose
-    );
+    requestAnimationFrame(processFrame);
 }
 
 
-/* =========================
-   РЕЗУЛЬТАТ
-========================= */
+// ===============================
+// РЕЗУЛЬТАТ AI
+// ===============================
 
 function onResults(results) {
 
-    canvas.width =
-        video.videoWidth;
-
-    canvas.height =
-        video.videoHeight;
-
+    canvas.width = video.videoWidth || canvas.width;
+    canvas.height = video.videoHeight || canvas.height;
 
     ctx.clearRect(
         0,
@@ -403,49 +267,62 @@ function onResults(results) {
         canvas.height
     );
 
-
-    if (
-        results.poseLandmarks
-    ) {
-
-        drawConnectors(
-            ctx,
-            results.poseLandmarks,
-            POSE_CONNECTIONS,
-            {
-                color: "#00FF00",
-                lineWidth: 5
-            }
-        );
-
-
-        drawLandmarks(
-            ctx,
-            results.poseLandmarks,
-            {
-                color: "#FF0000",
-                lineWidth: 2,
-                radius: 6
-            }
-        );
-
-
-        countPushUp(
-            results.poseLandmarks
-        );
-
-
-    } else {
+    if (!results.poseLandmarks) {
 
         status.textContent =
-            "Встань в кадр";
+            "Человек не найден";
+
+        return;
     }
+
+
+    // ЛИНИИ СКЕЛЕТА
+
+    drawConnectors(
+        ctx,
+        results.poseLandmarks,
+        POSE_CONNECTIONS,
+        {
+            color: "#00FF00",
+            lineWidth: 5
+        }
+    );
+
+
+    // ТОЧКИ
+
+    drawLandmarks(
+        ctx,
+        results.poseLandmarks,
+        {
+            color: "#FF0000",
+            lineWidth: 2,
+            radius: 6
+        }
+    );
+
+
+    countPushUp(results.poseLandmarks);
 }
 
 
-/* =========================
-   УГОЛ
-========================= */
+// ===============================
+// ПРОВЕРКА ВИДИМОСТИ
+// ===============================
+
+function visible(point) {
+
+    return (
+        point &&
+        point.visibility !== undefined &&
+        point.visibility >= 0.35
+    );
+}
+
+
+// ===============================
+// УГОЛ
+// ===============================
 
 function calculateAngle(a, b, c) {
 
@@ -453,237 +330,50 @@ function calculateAngle(a, b, c) {
         Math.atan2(
             c.y - b.y,
             c.x - b.x
-        ) -
+        )
+        -
         Math.atan2(
             a.y - b.y,
             a.x - b.x
         );
-
 
     let angle =
         Math.abs(
             radians * 180 / Math.PI
         );
 
-
     if (angle > 180) {
-        angle = 360 - angle;
-    }
 
+        angle = 360 - angle;
+
+    }
 
     return angle;
 }
 
 
-/* =========================
-   ВИДИМОСТЬ
-========================= */
+// ===============================
+// ПРОВЕРКА ЛОКТЕЙ
+// ===============================
 
-function visible(point) {
+function elbowsAreReasonable(landmarks) {
 
-    return (
-        point &&
-        point.visibility >= 0.45
-    );
-}
+    const leftShoulder = landmarks[11];
+    const rightShoulder = landmarks[12];
 
-
-/* =========================
-   ПРОВЕРКА НОГ
-========================= */
-
-function legsAreExtended(landmarks) {
-
-    const leftHip =
-        landmarks[23];
-
-    const leftKnee =
-        landmarks[25];
-
-    const leftAnkle =
-        landmarks[27];
-
-    const rightHip =
-        landmarks[24];
-
-    const rightKnee =
-        landmarks[26];
-
-    const rightAnkle =
-        landmarks[28];
-
-
-    if (
-        !visible(leftHip) ||
-        !visible(leftKnee) ||
-        !visible(leftAnkle) ||
-
-        !visible(rightHip) ||
-        !visible(rightKnee) ||
-        !visible(rightAnkle)
-    ) {
-
-        return false;
-    }
-
-
-    const leftKneeAngle =
-        calculateAngle(
-            leftHip,
-            leftKnee,
-            leftAnkle
-        );
-
-
-    const rightKneeAngle =
-        calculateAngle(
-            rightHip,
-            rightKnee,
-            rightAnkle
-        );
-
-
-    /*
-     * Мягкий порог.
-     *
-     * Если человек стоит на коленях,
-     * угол обычно значительно меньше.
-     */
-
-    return (
-        leftKneeAngle > 135 &&
-        rightKneeAngle > 135
-    );
-}
-
-
-/* =========================
-   ПРОВЕРКА КОРПУСА
-========================= */
-
-function bodyIsReasonablyStraight(landmarks) {
-
-    const leftShoulder =
-        landmarks[11];
-
-    const leftHip =
-        landmarks[23];
-
-    const leftAnkle =
-        landmarks[27];
-
-
-    const rightShoulder =
-        landmarks[12];
-
-    const rightHip =
-        landmarks[24];
-
-    const rightAnkle =
-        landmarks[28];
-
+    const leftElbow = landmarks[13];
+    const rightElbow = landmarks[14];
 
     if (
         !visible(leftShoulder) ||
-        !visible(leftHip) ||
-        !visible(leftAnkle) ||
-
         !visible(rightShoulder) ||
-        !visible(rightHip) ||
-        !visible(rightAnkle)
-    ) {
-
-        return false;
-    }
-
-
-    const leftAngle =
-        calculateAngle(
-            leftShoulder,
-            leftHip,
-            leftAnkle
-        );
-
-
-    const rightAngle =
-        calculateAngle(
-            rightShoulder,
-            rightHip,
-            rightAnkle
-        );
-
-
-    /*
-     * Не требуем идеальной прямой.
-     */
-
-    return (
-        leftAngle > 135 &&
-        rightAngle > 135
-    );
-}
-
-
-/* =========================
-   ПРОВЕРКА ЛОКТЕЙ
-========================= */
-
-function elbowsAreAcceptable(landmarks) {
-
-    const leftShoulder =
-        landmarks[11];
-
-    const leftElbow =
-        landmarks[13];
-
-    const leftWrist =
-        landmarks[15];
-
-
-    const rightShoulder =
-        landmarks[12];
-
-    const rightElbow =
-        landmarks[14];
-
-    const rightWrist =
-        landmarks[16];
-
-
-    if (
-        !visible(leftShoulder) ||
         !visible(leftElbow) ||
-        !visible(leftWrist) ||
-
-        !visible(rightShoulder) ||
-        !visible(rightElbow) ||
-        !visible(rightWrist)
+        !visible(rightElbow)
     ) {
 
-        return false;
+        return true;
     }
 
-
-    const leftAngle =
-        calculateAngle(
-            leftShoulder,
-            leftElbow,
-            leftWrist
-        );
-
-
-    const rightAngle =
-        calculateAngle(
-            rightShoulder,
-            rightElbow,
-            rightWrist
-        );
-
-
-    /*
-     * Слишком экстремально
-     * разведённые локти.
-     */
 
     const shoulderWidth =
         Math.abs(
@@ -692,140 +382,208 @@ function elbowsAreAcceptable(landmarks) {
         );
 
 
-    const elbowWidth =
+    const leftDistance =
         Math.abs(
             leftElbow.x -
-            rightElbow.x
+            leftShoulder.x
+        );
+
+    const rightDistance =
+        Math.abs(
+            rightElbow.x -
+            rightShoulder.x
         );
 
 
-    const elbowsTooWide =
-        elbowWidth >
-        shoulderWidth * 2.5;
+    /*
+        Не запрещаем обычное движение рук.
+        Блокируем только явно сильно разведённые локти.
+    */
+
+    if (
+        leftDistance > shoulderWidth * 2.8 ||
+        rightDistance > shoulderWidth * 2.8
+    ) {
+
+        return false;
+    }
 
 
-    return !elbowsTooWide;
+    return true;
 }
 
 
-/* =========================
-   СЧЁТЧИК
-========================= */
+// ===============================
+// ДОПОЛНИТЕЛЬНАЯ ПРОВЕРКА КОЛЕНЕЙ
+// ===============================
+
+function kneesLookSuspicious(landmarks) {
+
+    const leftHip = landmarks[23];
+    const rightHip = landmarks[24];
+
+    const leftKnee = landmarks[25];
+    const rightKnee = landmarks[26];
+
+    /*
+        ВАЖНО:
+
+        Если ноги не видны —
+        НЕ блокируем отжимание.
+
+        Это исправляет проблему,
+        когда камера не видит ноги полностью.
+    */
+
+    const leftVisible =
+        visible(leftHip) &&
+        visible(leftKnee);
+
+    const rightVisible =
+        visible(rightHip) &&
+        visible(rightKnee);
+
+
+    if (!leftVisible && !rightVisible) {
+
+        return false;
+    }
+
+
+    /*
+        Если колено очень близко к тазу
+        по вертикали, это может быть
+        положение с согнутыми ногами.
+    */
+
+    if (leftVisible) {
+
+        const hipKneeDistance =
+            Math.abs(
+                leftHip.y -
+                leftKnee.y
+            );
+
+        if (hipKneeDistance < 0.10) {
+
+            return true;
+        }
+    }
+
+
+    if (rightVisible) {
+
+        const hipKneeDistance =
+            Math.abs(
+                rightHip.y -
+                rightKnee.y
+            );
+
+        if (hipKneeDistance < 0.10) {
+
+            return true;
+        }
+    }
+
+
+    return false;
+}
+
+
+// ===============================
+// СЧЁТ ОТЖИМАНИЙ
+// ===============================
 
 function countPushUp(landmarks) {
 
-    const leftShoulder =
-        landmarks[11];
+    const leftShoulder = landmarks[11];
+    const leftElbow = landmarks[13];
+    const leftWrist = landmarks[15];
 
-    const leftElbow =
-        landmarks[13];
-
-    const leftWrist =
-        landmarks[15];
-
-
-    const rightShoulder =
-        landmarks[12];
-
-    const rightElbow =
-        landmarks[14];
-
-    const rightWrist =
-        landmarks[16];
+    const rightShoulder = landmarks[12];
+    const rightElbow = landmarks[14];
+    const rightWrist = landmarks[16];
 
 
-    if (
-        !visible(leftShoulder) ||
-        !visible(leftElbow) ||
-        !visible(leftWrist) ||
+    /*
+        Для счёта нужны только руки.
 
-        !visible(rightShoulder) ||
-        !visible(rightElbow) ||
-        !visible(rightWrist)
-    ) {
+        Ноги теперь НЕ обязательны.
+    */
+
+    const leftReady =
+        visible(leftShoulder) &&
+        visible(leftElbow) &&
+        visible(leftWrist);
+
+    const rightReady =
+        visible(rightShoulder) &&
+        visible(rightElbow) &&
+        visible(rightWrist);
+
+
+    if (!leftReady && !rightReady) {
 
         status.textContent =
-            "Плохо видно руки";
+            "Покажи руки камере";
 
         return;
     }
 
 
-    /*
-     * Угол локтей
-     */
+    let angles = [];
 
-    const leftAngle =
-        calculateAngle(
-            leftShoulder,
-            leftElbow,
-            leftWrist
+
+    if (leftReady) {
+
+        angles.push(
+            calculateAngle(
+                leftShoulder,
+                leftElbow,
+                leftWrist
+            )
         );
+    }
 
 
-    const rightAngle =
-        calculateAngle(
-            rightShoulder,
-            rightElbow,
-            rightWrist
+    if (rightReady) {
+
+        angles.push(
+            calculateAngle(
+                rightShoulder,
+                rightElbow,
+                rightWrist
+            )
         );
+    }
 
 
     const averageAngle =
-        (
-            leftAngle +
-            rightAngle
-        ) / 2;
+        angles.reduce(
+            (a, b) => a + b,
+            0
+        ) / angles.length;
 
 
-    /*
-     * Проверяем ноги.
-     */
-
-    const legsOK =
-        legsAreExtended(
-            landmarks
-        );
-
-
-    /*
-     * Проверяем корпус.
-     */
-
-    const bodyOK =
-        bodyIsReasonablyStraight(
-            landmarks
-        );
-
-
-    /*
-     * НИЖНЯЯ ТОЧКА
-     */
+    // ===========================
+    // ВНИЗ
+    // ===========================
 
     if (
         averageAngle < 110 &&
         position === "up"
     ) {
 
-        /*
-         * Запоминаем движение вниз,
-         * даже если техника немного плохая.
-         */
-
         position = "down";
 
-        canCount = true;
-
         status.textContent =
-            "Вверх 💪";
-
-        return;
+            "⬇️ Вниз";
     }
 
 
-    /*
-     * ВЕРХНЯЯ ТОЧКА
-     */
+    // ===========================
+    // ВВЕРХ
+    // ===========================
 
     if (
         averageAngle > 150 &&
@@ -833,62 +591,109 @@ function countPushUp(landmarks) {
         canCount
     ) {
 
+        const now = Date.now();
+
+
         /*
-         * Повтор засчитываем только
-         * если ноги и корпус подходят.
-         */
+            Защита от двойного счёта.
+        */
 
-        if (!legsOK) {
-
-            status.textContent =
-                "Выпрями ноги ❌";
-
-        } else if (!bodyOK) {
-
-            status.textContent =
-                "Держи корпус ровнее ❌";
-
-        } else if (
-            !elbowsAreAcceptable(landmarks)
+        if (
+            now - lastCountTime > 500
         ) {
 
-            status.textContent =
-                "Локти слишком в стороны ❌";
 
-        } else {
+            // Локти
 
-            pushUps++;
+            const elbowsOK =
+                elbowsAreReasonable(
+                    landmarks
+                );
 
-            counter.textContent =
-                "Отжимания: " +
-                pushUps;
 
-            status.textContent =
-                "Отжимание засчитано ✅";
+            // Колени
+
+            const kneesBad =
+                kneesLookSuspicious(
+                    landmarks
+                );
+
+
+            /*
+                Если AI видит колени
+                и считает их подозрительными —
+                не засчитываем.
+
+                Если ног вообще не видно —
+                отжимание всё равно считается.
+            */
+
+            if (
+                elbowsOK &&
+                !kneesBad
+            ) {
+
+                pushUps++;
+
+                counter.textContent =
+                    pushUps;
+
+                status.textContent =
+                    "🔥 Отлично!";
+
+                lastCountTime = now;
+
+            } else {
+
+                status.textContent =
+                    "⚠️ Исправь технику";
+            }
+
+
+            position = "up";
+
+            canCount = false;
+
+
+            setTimeout(
+                () => {
+                    canCount = true;
+                },
+                300
+            );
         }
-
-
-        position = "up";
-
-        canCount = false;
-
-        return;
     }
 
 
-    /*
-     * Подготовка следующего повтора.
-     */
+    // ===========================
+    // ПОДСКАЗКИ
+    // ===========================
 
     if (
-        averageAngle < 120 &&
-        position === "up"
+        position === "up" &&
+        averageAngle > 150
     ) {
 
-        canCount = true;
+        status.textContent =
+            "Готов. Опускайся ⬇️";
     }
-
 }
+
+
+// ===============================
+// КНОПКА
+// ===============================
+
+button.addEventListener(
+    "click",
+    async function() {
+
+        button.style.display = "none";
+
+        await startCamera();
+
+    }
+);
 
 </script>
 
