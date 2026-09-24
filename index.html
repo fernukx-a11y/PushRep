@@ -11,7 +11,7 @@
     <style>
         body {
             margin: 0;
-            padding: 30px 20px;
+            padding: 25px 15px;
             font-family: Arial, sans-serif;
             text-align: center;
             background: #111;
@@ -19,23 +19,29 @@
         }
 
         h1 {
-            margin-top: 40px;
-            font-size: 32px;
+            margin-top: 20px;
         }
 
         p {
             color: #aaa;
-            font-size: 17px;
         }
 
         button {
-            margin-top: 30px;
-            padding: 16px 30px;
+            margin-top: 20px;
+            padding: 15px 25px;
             border: none;
             border-radius: 12px;
             font-size: 18px;
             font-weight: bold;
             cursor: pointer;
+        }
+
+        video {
+            width: 100%;
+            max-width: 500px;
+            margin-top: 25px;
+            border-radius: 15px;
+            display: none;
         }
     </style>
 </head>
@@ -46,9 +52,11 @@
 
     <p>AI-счётчик отжиманий</p>
 
-    <button onclick="startWorkout()">
-        Начать тренировку
+    <button onclick="startCamera()">
+        📷 Включить камеру
     </button>
+
+    <video id="camera" autoplay playsinline></video>
 
     <script>
         const tg = window.Telegram.WebApp;
@@ -56,8 +64,21 @@
         tg.ready();
         tg.expand();
 
-        function startWorkout() {
-            alert("🚧 Тренировка пока в разработке");
+        async function startCamera() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: true,
+                    audio: false
+                });
+
+                const video = document.getElementById("camera");
+
+                video.srcObject = stream;
+                video.style.display = "block";
+
+            } catch (error) {
+                alert("Не удалось включить камеру: " + error.message);
+            }
         }
     </script>
 
