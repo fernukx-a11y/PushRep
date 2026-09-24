@@ -2,75 +2,442 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+
     <title>PushRep</title>
 
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+
     <style>
-        body {
-            background: #111;
+        * {
+            box-sizing: border-box;
+        }
+
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background: #000;
+            font-family: Arial, sans-serif;
+        }
+
+        #startScreen {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
             color: white;
             text-align: center;
-            font-family: Arial;
             padding: 20px;
         }
 
-        button {
-            padding: 15px 25px;
-            font-size: 18px;
-            border: 0;
-            border-radius: 12px;
-            margin: 20px;
+        #startScreen h1 {
+            font-size: 32px;
+            margin-bottom: 10px;
         }
 
-        video {
+        #startScreen p {
+            color: #aaa;
+        }
+
+        #cameraButton {
+            margin-top: 25px;
+            padding: 16px 28px;
+            border: none;
+            border-radius: 14px;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        #cameraBox {
+            position: fixed;
+            inset: 0;
+            width: 100vw;
+            height: 100vh;
+            background: #000;
+            display: none;
+            overflow: hidden;
+        }
+
+        #camera {
+            position: absolute;
             width: 100%;
-            max-width: 500px;
-            border-radius: 15px;
+            height: 100%;
+
+            /*
+             * Заполняем весь экран.
+             * Камера НЕ зеркалится.
+             */
+            object-fit: cover;
+            transform: none;
+        }
+
+        #canvas {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+
+            /*
+             * Canvas тоже НЕ зеркалится.
+             */
+            transform: none;
+        }
+
+        #status {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+
+            padding: 10px 16px;
+            border-radius: 12px;
+
+            background: rgba(0, 0, 0, 0.6);
+            color: white;
+
+            font-size: 15px;
+            z-index: 10;
         }
     </style>
 </head>
 
 <body>
 
-<h1>💪 PushRep</h1>
+<div id="startScreen">
 
-<button id="cameraButton">📷 Включить камеру</button>
+    <h1>💪 PushRep</h1>
 
-<br>
+    <p>AI-счётчик отжиманий</p>
 
-<video id="camera" autoplay playsinline></video>
+    <button id="cameraButton">
+        📷 Включить камеру
+    </button>
 
-<p id="status">Камера выключена</p>
+</div>
 
-<script>
 
-const button = document.getElementById("cameraButton");
-const video = document.getElementById("camera");
-const status = document.getElementById("status");
+<div id="cameraBox">
 
-button.addEventListener("click", async () => {
+    <video
+        id="camera"
+        autoplay
+        playsinline
+    ></video>
+
+    <canvas id="canvas"></canvas>
+
+    <div id="status">
+        Запуск...
+    </div>
+
+</div>
+
+
+<script type="module">
+
+import {
+    PoseLandmarker,
+    FilesetResolver,
+    DrawingUtils
+} from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.22/+esm";
+
+
+/* =========================
+   TELEGRAM
+========================= */
+
+const tg = window.Telegram.WebApp;
+
+tg.ready();
+tg.expand();
+
+
+/* =========================
+   ELEMENTS
+========================= */
+
+const startScreen =
+    document.getElementById("startScreen");
+
+const cameraButton =
+    document.getElementById("cameraButton");
+
+const cameraBox =
+    document.getElementById("cameraBox");
+
+const video =
+    document.getElementById("camera");
+
+const canvas =
+    document.getElementById("canvas");
+
+const ctx =
+    canvas.getContext("2d");
+
+const status =
+    document.getElementById("status");
+
+
+/* =========================
+   VARIABLES
+========================= */
+
+let poseLandmarker = null;
+
+let lastVideoTime = -1;
+
+
+/* =========================
+   BUTTON
+========================= */
+
+cameraButton.addEventListener(
+    "click",
+    startCamera
+);
+
+
+/* =========================
+   CAMERA
+========================= */
+
+async function startCamera() {
 
     try {
 
-        status.textContent = "Запрашиваем камеру...";
+        status.textContent =
+            "Запрашиваем камеру...";
 
-        const stream = await navigator.mediaDevices.getUserMedia({
-            video: true,
-            audio: false
-        });
+        startScreen.style.display =
+            "none";
+
+        cameraBox.style.display =
+            "block";
+
+
+        const stream =
+            await navigator.mediaDevices.getUserMedia({
+
+                video: {
+                    facingMode: "user",
+
+                    width: {
+                        ideal: 1920
+                    },
+
+                    height: {
+                        ideal: 1080
+                    }
+                },
+
+                audio: false
+            });
+
 
         video.srcObject = stream;
 
-        status.textContent = "Камера работает ✅";
+        await video.play();
+
+
+        status.textContent =
+            "Камера работает. Загружаем AI...";
+
+
+        await loadAI();
+
+
+        status.textContent =
+            "AI готов 🤖";
+
+
+        requestAnimationFrame(
+            detectPose
+        );
+
 
     } catch (error) {
 
         console.error(error);
 
-        status.textContent = "Ошибка: " + error.message;
+        cameraBox.style.display =
+            "none";
+
+        startScreen.style.display =
+            "flex";
+
+        alert(
+            "Ошибка камеры: " +
+            error.message
+        );
+    }
+}
+
+
+/* =========================
+   LOAD AI
+========================= */
+
+async function loadAI() {
+
+    const vision =
+        await FilesetResolver.forVisionTasks(
+
+            "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.22/wasm"
+
+        );
+
+
+    poseLandmarker =
+        await PoseLandmarker.createFromOptions(
+
+            vision,
+
+            {
+
+                baseOptions: {
+
+                    modelAssetPath:
+                        "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task"
+
+                },
+
+                runningMode: "VIDEO",
+
+                numPoses: 1
+
+            }
+
+        );
+}
+
+
+/* =========================
+   POSE DETECTION
+========================= */
+
+function detectPose() {
+
+    if (!poseLandmarker) {
+
+        requestAnimationFrame(
+            detectPose
+        );
+
+        return;
     }
 
-});
+
+    if (video.readyState >= 2) {
+
+        if (
+            video.currentTime !==
+            lastVideoTime
+        ) {
+
+            lastVideoTime =
+                video.currentTime;
+
+
+            /*
+             * Размер canvas такой же,
+             * как у оригинального видео.
+             */
+
+            canvas.width =
+                video.videoWidth;
+
+            canvas.height =
+                video.videoHeight;
+
+
+            const results =
+                poseLandmarker.detectForVideo(
+
+                    video,
+
+                    performance.now()
+
+                );
+
+
+            ctx.clearRect(
+
+                0,
+                0,
+                canvas.width,
+                canvas.height
+
+            );
+
+
+            if (
+                results.landmarks.length > 0
+            ) {
+
+                const drawingUtils =
+                    new DrawingUtils(ctx);
+
+
+                const landmarks =
+                    results.landmarks[0];
+
+
+                /*
+                 * ЛИНИИ СКЕЛЕТА
+                 */
+
+                drawingUtils.drawConnectors(
+
+                    landmarks,
+
+                    PoseLandmarker.POSE_CONNECTIONS,
+
+                    {
+                        lineWidth: 5
+                    }
+
+                );
+
+
+                /*
+                 * ТОЧКИ СУСТАВОВ
+                 */
+
+                drawingUtils.drawLandmarks(
+
+                    landmarks,
+
+                    {
+                        radius: 7,
+                        lineWidth: 3
+                    }
+
+                );
+
+
+                status.textContent =
+                    "Человек обнаружен 🤖";
+
+            } else {
+
+                status.textContent =
+                    "Встань в кадр";
+            }
+        }
+    }
+
+
+    requestAnimationFrame(
+        detectPose
+    );
+}
 
 </script>
 
