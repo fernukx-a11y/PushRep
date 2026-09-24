@@ -76,8 +76,6 @@
             width: 100%;
             height: 100%;
             object-fit: cover;
-
-            /* НЕ зеркалим */
             transform: none;
         }
 
@@ -86,8 +84,6 @@
             inset: 0;
             width: 100%;
             height: 100%;
-
-            /* НЕ зеркалим */
             transform: none;
         }
 
@@ -96,13 +92,10 @@
             top: 20px;
             left: 50%;
             transform: translateX(-50%);
-
             padding: 10px 16px;
             border-radius: 12px;
-
             background: rgba(0, 0, 0, 0.65);
             color: white;
-
             font-size: 15px;
             z-index: 10;
             white-space: nowrap;
@@ -124,7 +117,6 @@
 
 </div>
 
-
 <div id="cameraBox">
 
     <video id="camera"
@@ -140,7 +132,6 @@
     </div>
 
 </div>
-
 
 <script>
 
@@ -199,7 +190,7 @@ async function startCamera() {
             await navigator.mediaDevices.getUserMedia({
 
                 video: {
-                    facingMode: "environment",
+                    facingMode: "user",
 
                     width: {
                         ideal: 1920
@@ -232,10 +223,6 @@ async function startCamera() {
         status.textContent =
             "Камера работает ✅";
 
-
-        /*
-         * Теперь запускаем AI
-         */
 
         startAI();
 
@@ -399,10 +386,6 @@ function onResults(results) {
         results.poseLandmarks
     ) {
 
-        /*
-         * ЛИНИИ
-         */
-
         drawConnectors(
             ctx,
             results.poseLandmarks,
@@ -413,10 +396,6 @@ function onResults(results) {
             }
         );
 
-
-        /*
-         * ТОЧКИ
-         */
 
         drawLandmarks(
             ctx,
