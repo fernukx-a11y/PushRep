@@ -2,12 +2,9 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport"
-          content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 
     <title>PushRep</title>
-
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
 
     <style>
         * {
@@ -16,7 +13,6 @@
 
         html, body {
             margin: 0;
-            padding: 0;
             width: 100%;
             height: 100%;
             overflow: hidden;
@@ -32,16 +28,14 @@
             justify-content: center;
             align-items: center;
             color: white;
-            text-align: center;
-            padding: 20px;
         }
 
-        #startScreen h1 {
+        h1 {
             font-size: 32px;
-            margin-bottom: 10px;
+            margin: 0 0 10px;
         }
 
-        #startScreen p {
+        p {
             color: #aaa;
         }
 
@@ -58,24 +52,14 @@
         #cameraBox {
             position: fixed;
             inset: 0;
-            width: 100vw;
-            height: 100vh;
-            background: #000;
             display: none;
-            overflow: hidden;
+            background: black;
         }
 
         #camera {
-            position: absolute;
             width: 100%;
             height: 100%;
-
-            /*
-             * Заполняем весь экран.
-             * Камера НЕ зеркалится.
-             */
             object-fit: cover;
-            transform: none;
         }
 
         #canvas {
@@ -83,11 +67,6 @@
             inset: 0;
             width: 100%;
             height: 100%;
-
-            /*
-             * Canvas тоже НЕ зеркалится.
-             */
-            transform: none;
         }
 
         #status {
@@ -95,15 +74,11 @@
             top: 20px;
             left: 50%;
             transform: translateX(-50%);
-
-            padding: 10px 16px;
-            border-radius: 12px;
-
-            background: rgba(0, 0, 0, 0.6);
+            padding: 10px 15px;
+            border-radius: 10px;
+            background: rgba(0,0,0,0.65);
             color: white;
-
-            font-size: 15px;
-            z-index: 10;
+            z-index: 5;
         }
     </style>
 </head>
@@ -125,120 +100,60 @@
 
 <div id="cameraBox">
 
-    <video
-        id="camera"
-        autoplay
-        playsinline
-    ></video>
+    <video id="camera" autoplay playsinline></video>
 
     <canvas id="canvas"></canvas>
 
     <div id="status">
-        Запуск...
+        Запуск камеры...
     </div>
 
 </div>
 
 
-<script type="module">
+<script>
 
-import {
-    PoseLandmarker,
-    FilesetResolver,
-    DrawingUtils
-} from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.22/+esm";
+const button = document.getElementById("cameraButton");
 
+const startScreen = document.getElementById("startScreen");
 
-/* =========================
-   TELEGRAM
-========================= */
+const cameraBox = document.getElementById("cameraBox");
 
-const tg = window.Telegram.WebApp;
+const video = document.getElementById("camera");
 
-tg.ready();
-tg.expand();
+const status = document.getElementById("status");
+
+const canvas = document.getElementById("canvas");
+
+const ctx = canvas.getContext("2d");
 
 
-/* =========================
-   ELEMENTS
-========================= */
-
-const startScreen =
-    document.getElementById("startScreen");
-
-const cameraButton =
-    document.getElementById("cameraButton");
-
-const cameraBox =
-    document.getElementById("cameraBox");
-
-const video =
-    document.getElementById("camera");
-
-const canvas =
-    document.getElementById("canvas");
-
-const ctx =
-    canvas.getContext("2d");
-
-const status =
-    document.getElementById("status");
-
-
-/* =========================
-   VARIABLES
-========================= */
-
-let poseLandmarker = null;
-
-let lastVideoTime = -1;
-
-
-/* =========================
-   BUTTON
-========================= */
-
-cameraButton.addEventListener(
-    "click",
-    startCamera
-);
-
-
-/* =========================
-   CAMERA
-========================= */
-
-async function startCamera() {
+button.addEventListener("click", async function () {
 
     try {
 
-        status.textContent =
-            "Запрашиваем камеру...";
+        status.textContent = "Запрашиваем камеру...";
 
-        startScreen.style.display =
-            "none";
+        startScreen.style.display = "none";
 
-        cameraBox.style.display =
-            "block";
+        cameraBox.style.display = "block";
 
 
-        const stream =
-            await navigator.mediaDevices.getUserMedia({
+        const stream = await navigator.mediaDevices.getUserMedia({
 
-                video: {
-                    facingMode: "user",
-
-                    width: {
-                        ideal: 1920
-                    },
-
-                    height: {
-                        ideal: 1080
-                    }
+            video: {
+                facingMode: "user",
+                width: {
+                    ideal: 1920
                 },
+                height: {
+                    ideal: 1080
+                }
+            },
 
-                audio: false
-            });
+            audio: false
+
+        });
 
 
         video.srcObject = stream;
@@ -246,197 +161,193 @@ async function startCamera() {
         await video.play();
 
 
-        status.textContent =
-            "Камера работает. Загружаем AI...";
+        status.textContent = "Камера работает ✅";
 
 
-        await loadAI();
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
 
 
-        status.textContent =
-            "AI готов 🤖";
+        /*
+         * Теперь после запуска камеры
+         * загружаем AI.
+         */
 
-
-        requestAnimationFrame(
-            detectPose
-        );
+        loadAI();
 
 
     } catch (error) {
 
         console.error(error);
 
-        cameraBox.style.display =
-            "none";
+        startScreen.style.display = "flex";
 
-        startScreen.style.display =
-            "flex";
+        cameraBox.style.display = "none";
 
         alert(
-            "Ошибка камеры: " +
+            "Ошибка камеры:\n" +
             error.message
         );
+
     }
-}
 
+});
 
-/* =========================
-   LOAD AI
-========================= */
 
 async function loadAI() {
 
-    const vision =
-        await FilesetResolver.forVisionTasks(
+    try {
 
-            "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.22/wasm"
-
-        );
+        status.textContent = "Загружаем AI...";
 
 
-    poseLandmarker =
-        await PoseLandmarker.createFromOptions(
-
-            vision,
-
-            {
-
-                baseOptions: {
-
-                    modelAssetPath:
-                        "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task"
-
-                },
-
-                runningMode: "VIDEO",
-
-                numPoses: 1
-
-            }
-
-        );
-}
+        const module =
+            await import(
+                "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.22/+esm"
+            );
 
 
-/* =========================
-   POSE DETECTION
-========================= */
+        const PoseLandmarker =
+            module.PoseLandmarker;
 
-function detectPose() {
+        const FilesetResolver =
+            module.FilesetResolver;
 
-    if (!poseLandmarker) {
-
-        requestAnimationFrame(
-            detectPose
-        );
-
-        return;
-    }
+        const DrawingUtils =
+            module.DrawingUtils;
 
 
-    if (video.readyState >= 2) {
+        const vision =
+            await FilesetResolver.forVisionTasks(
 
-        if (
-            video.currentTime !==
-            lastVideoTime
-        ) {
-
-            lastVideoTime =
-                video.currentTime;
-
-
-            /*
-             * Размер canvas такой же,
-             * как у оригинального видео.
-             */
-
-            canvas.width =
-                video.videoWidth;
-
-            canvas.height =
-                video.videoHeight;
-
-
-            const results =
-                poseLandmarker.detectForVideo(
-
-                    video,
-
-                    performance.now()
-
-                );
-
-
-            ctx.clearRect(
-
-                0,
-                0,
-                canvas.width,
-                canvas.height
+                "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.22/wasm"
 
             );
 
 
-            if (
-                results.landmarks.length > 0
-            ) {
+        const poseLandmarker =
+            await PoseLandmarker.createFromOptions(
 
-                const drawingUtils =
-                    new DrawingUtils(ctx);
+                vision,
+
+                {
+
+                    baseOptions: {
+
+                        modelAssetPath:
+                            "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task"
+
+                    },
+
+                    runningMode: "VIDEO",
+
+                    numPoses: 1
+
+                }
+
+            );
 
 
-                const landmarks =
-                    results.landmarks[0];
+        status.textContent = "AI готов 🤖";
 
 
-                /*
-                 * ЛИНИИ СКЕЛЕТА
-                 */
+        function detectPose() {
 
-                drawingUtils.drawConnectors(
+            if (video.readyState >= 2) {
 
-                    landmarks,
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
 
-                    PoseLandmarker.POSE_CONNECTIONS,
 
-                    {
-                        lineWidth: 5
-                    }
+                const results =
+                    poseLandmarker.detectForVideo(
 
+                        video,
+
+                        performance.now()
+
+                    );
+
+
+                ctx.clearRect(
+                    0,
+                    0,
+                    canvas.width,
+                    canvas.height
                 );
 
 
-                /*
-                 * ТОЧКИ СУСТАВОВ
-                 */
+                if (results.landmarks.length > 0) {
 
-                drawingUtils.drawLandmarks(
-
-                    landmarks,
-
-                    {
-                        radius: 7,
-                        lineWidth: 3
-                    }
-
-                );
+                    const drawingUtils =
+                        new DrawingUtils(ctx);
 
 
-                status.textContent =
-                    "Человек обнаружен 🤖";
+                    const landmarks =
+                        results.landmarks[0];
 
-            } else {
 
-                status.textContent =
-                    "Встань в кадр";
+                    drawingUtils.drawConnectors(
+
+                        landmarks,
+
+                        PoseLandmarker.POSE_CONNECTIONS,
+
+                        {
+                            lineWidth: 5
+                        }
+
+                    );
+
+
+                    drawingUtils.drawLandmarks(
+
+                        landmarks,
+
+                        {
+                            radius: 7,
+                            lineWidth: 3
+                        }
+
+                    );
+
+
+                    status.textContent =
+                        "Человек обнаружен 🤖";
+
+                } else {
+
+                    status.textContent =
+                        "Встань в кадр";
+
+                }
+
             }
+
+
+            requestAnimationFrame(detectPose);
+
         }
+
+
+        detectPose();
+
+
+    } catch (error) {
+
+        console.error(error);
+
+        status.textContent =
+            "Камера работает, но AI не загрузился";
+
+        alert(
+            "Камера работает.\n\n" +
+            "Ошибка AI:\n" +
+            error.message
+        );
+
     }
 
-
-    requestAnimationFrame(
-        detectPose
-    );
 }
 
 </script>
