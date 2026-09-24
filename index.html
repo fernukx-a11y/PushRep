@@ -92,13 +92,10 @@
             top: 20px;
             left: 50%;
             transform: translateX(-50%);
-
             padding: 10px 16px;
             border-radius: 12px;
-
-            background: rgba(0, 0, 0, 0.65);
+            background: rgba(0, 0, 0, 0.7);
             color: white;
-
             font-size: 15px;
             z-index: 10;
             white-space: nowrap;
@@ -109,16 +106,12 @@
             top: 70px;
             left: 50%;
             transform: translateX(-50%);
-
             color: white;
-            background: rgba(0, 0, 0, 0.7);
-
+            background: rgba(0, 0, 0, 0.75);
             padding: 10px 22px;
             border-radius: 15px;
-
             font-size: 28px;
             font-weight: bold;
-
             z-index: 10;
         }
     </style>
@@ -188,9 +181,7 @@ const counter =
 
 
 let pose = null;
-
 let cameraStream = null;
-
 let aiReady = false;
 
 
@@ -200,9 +191,20 @@ let aiReady = false;
 
 let pushUps = 0;
 
+/*
+ * up = верхняя позиция
+ * down = нижняя позиция
+ */
+
 let position = "up";
 
-let downDetected = false;
+
+/*
+ * Чтобы одно движение
+ * не засчиталось несколько раз
+ */
+
+let canCount = true;
 
 
 /* =========================
@@ -312,7 +314,6 @@ function startAI() {
 
         status.textContent =
             "AI ещё загружается...";
-
 
         setTimeout(
             startAI,
@@ -457,10 +458,6 @@ function onResults(results) {
         );
 
 
-        status.textContent =
-            "Человек обнаружен 🤖";
-
-
         countPushUp(
             results.poseLandmarks
         );
@@ -499,7 +496,7 @@ function calculateAngle(
 
     let angle =
         Math.abs(
-            radians * 180.0 / Math.PI
+            radians * 180 / Math.PI
         );
 
 
@@ -516,34 +513,122 @@ function calculateAngle(
 
 
 /* =========================
-   СЧЁТ ОТЖИМАНИЙ
+   РАССТОЯНИЕ
 ========================= */
 
-function countPushUp(
-    landmarks
-) {
+function distance(a, b) {
 
-    /*
-     * Левая сторона:
-     *
-     * 11 = левое плечо
-     * 13 = левый локоть
-     * 15 = левое запястье
-     */
+    const dx =
+        a.x - b.x;
 
-    const shoulder =
+    const dy =
+        a.y - b.y;
+
+    return Math.sqrt(
+        dx * dx +
+        dy * dy
+    );
+}
+
+
+/* =========================
+   ПРОВЕРКА ТЕЛА
+========================= */
+
+function validBodyPosition(landmarks) {
+
+    const shoulderLeft =
         landmarks[11];
 
-    const elbow =
-        landmarks[13];
+    const shoulderRight =
+        landmarks[12];
 
-    const wrist =
-        landmarks[15];
+    const hipLeft =
+        landmarks[23];
+
+    const hipRight =
+        landmarks[24];
 
 
     /*
-     * Правая сторона
+     * Средние точки плеч и таза
      */
+
+    const shoulder = {
+        x:
+            (
+                shoulderLeft.x +
+                shoulderRight.x
+            ) / 2,
+
+        y:
+            (
+                shoulderLeft.y +
+                shoulderRight.y
+            ) / 2
+    };
+
+
+    const hip = {
+        x:
+            (
+                hipLeft.x +
+                hipRight.x
+            ) / 2,
+
+        y:
+            (
+                hipLeft.y +
+                hipRight.y
+            ) / 2
+    };
+
+
+    /*
+     * Проверяем, что корпус
+     * находится примерно в прямой линии.
+     */
+
+    const bodyAngle =
+        Math.atan2(
+            hip.y - shoulder.y,
+            hip.x - shoulder.x
+        ) *
+        180 /
+        Math.PI;
+
+
+    const absoluteAngle =
+        Math.abs(bodyAngle);
+
+
+    /*
+     * Для бокового положения
+     * допускаем широкий диапазон.
+     */
+
+    return (
+        absoluteAngle > 5 &&
+        absoluteAngle < 175
+    );
+}
+
+
+/* =========================
+   СЧЁТ ОТЖИМАНИЯ
+========================= */
+
+function countPushUp(landmarks) {
+
+    const shoulderLeft =
+        landmarks[11];
+
+    const elbowLeft =
+        landmarks[13];
+
+    const wristLeft =
+        landmarks[15];
+
 
     const shoulderRight =
         landmarks[12];
@@ -556,31 +641,43 @@ function countPushUp(
 
 
     /*
-     * Проверяем видимость точек
+     * Проверяем видимость
      */
 
     if (
-        shoulder.visibility < 0.5 ||
-        elbow.visibility < 0.5 ||
-        wrist.visibility < 0.5
+
+        shoulderLeft.visibility < 0.5 ||
+        elbowLeft.visibility < 0.5 ||
+        wristLeft.visibility < 0.5 ||
+
+        shoulderRight.visibility < 0.5 ||
+        elbowRight.visibility < 0.5 ||
+        wristRight.visibility < 0.5
+
     ) {
 
-        return;
+        status.textContent =
+            "Плохо видно руки";
 
+        return;
     }
 
 
     /*
-     * Считаем угол локтя
+     * Угол левого локтя
      */
 
     const leftAngle =
         calculateAngle(
-            shoulder,
-            elbow,
-            wrist
+            shoulderLeft,
+            elbowLeft,
+            wristLeft
         );
 
+
+    /*
+     * Угол правого локтя
+     */
 
     const rightAngle =
         calculateAngle(
@@ -591,7 +688,7 @@ function countPushUp(
 
 
     /*
-     * Средний угол
+     * Среднее значение
      */
 
     const angle =
@@ -602,45 +699,86 @@ function countPushUp(
 
 
     /*
+     * Проверяем положение тела
+     */
+
+    const bodyValid =
+        validBodyPosition(
+            landmarks
+        );
+
+
+    if (!bodyValid) {
+
+        status.textContent =
+            "Держи корпус ровнее";
+
+        return;
+    }
+
+
+    /*
      * НИЖНЯЯ ТОЧКА
-     *
-     * Локоть согнут
      */
 
     if (
-        angle < 100 &&
+
+        angle < 105 &&
         position === "up"
+
     ) {
 
         position = "down";
 
-        downDetected = true;
+        status.textContent =
+            "Вверх!";
 
+
+        canCount = true;
     }
 
 
     /*
      * ВЕРХНЯЯ ТОЧКА
-     *
-     * Руки снова выпрямлены
      */
 
     if (
+
         angle > 155 &&
         position === "down" &&
-        downDetected
+        canCount
+
     ) {
 
         pushUps++;
 
-        downDetected = false;
-
         position = "up";
+
+        canCount = false;
 
 
         counter.textContent =
             "Отжимания: " +
             pushUps;
+
+
+        status.textContent =
+            "Отлично! 💪";
+    }
+
+
+    /*
+     * Если снова достаточно
+     * согнул руки — разрешаем
+     * следующий повтор.
+     */
+
+    if (
+        angle < 115 &&
+        position === "up"
+    ) {
+
+        canCount = true;
 
     }
 
